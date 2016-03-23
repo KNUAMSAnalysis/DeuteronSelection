@@ -1,0 +1,72 @@
+#!/bin/bash
+
+match_string()
+{
+  MATCH=0
+  NOMATCH=90
+  PARAMS=2
+  BAD_PARAMS=91
+
+  [ $# -eq $PARAMS ] || return $BAD_PARAMS
+
+  case "$!" in
+    "$2") return $MATCH;;
+    *) return $NOMATCH;;
+  esac
+}
+
+prefix="root://eosams.cern.ch/"
+datapath="/eos/ams/Data/AMS02/2014/ISS.B950/pass6"
+surfix="?svcClass=amsuser"
+yearmonth="1105"
+outdir=FileList/set_$yearmonth
+
+/afs/cern.ch/project/eos/installation/0.3.15/bin/eos.select find /eos/ams/Data/AMS02/2014/ISS.B950/pass6 | grep root | gawk "BEGIN {dir=\"root://eosams.cern.ch/\"}{printf(\"%s%s\n\", dir, \$0)}" >> filelist.txt
+
+if [ ! -d "FileList" ]; then
+  mkdir FileList
+fi
+if [ ! -d "$outdir" ]; then
+  mkdir $outdir
+else
+  rm -rf $outdir
+  mkdir $outdir
+fi
+
+for i in `cat filelist.txt`
+do
+  newname=`echo $i | sed -e 's/^root:\/\/eosams.cern.ch\/\/eos\/ams\/Data\/AMS02\/2014\/ISS.B950\/pass6\///g' -e 's/\.[0-9]\{8\}\.root//g'`
+  currentyearmonth=`date -ud @$newname '+%y%m'`
+  match_string $currentyearmonth $yearmonth
+  if [ $? -eq 90 ]; then
+    yearmonth=$currentyearmonth
+    outdir=FileList/set_$yearmonth
+    if [ ! -d "$outdir" ]; then
+      mkdir $outdir
+      echo "Listing $yearmonth is done!"
+    fi
+  fi
+  echo $i >> $outdir/$newname
+done
+
+rm filelist.txt
+
+# Run Period Table for Datasets
+#       Unixtime                  UTC time
+# 1: 1305853512       /
+# 2:
+# 3:
+# 4:
+# 5:
+# 6:
+# 7:
+# 8:
+# 9:
+#10:
+#11:
+#12:
+#13:
+#14:
+#15:
+#16:
+

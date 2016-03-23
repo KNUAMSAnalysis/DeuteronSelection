@@ -1,0 +1,51 @@
+class Container
+{
+public:
+  unsigned int nLevel1;
+  unsigned int nParticle;
+  unsigned int nCharge;
+  unsigned int nTrTrack;
+  unsigned int nTrdTrack;
+  unsigned int nAntiCluster;
+  unsigned int nTofClustersInTime;
+  unsigned int nRichRing;
+  unsigned int nRichRingB;
+  unsigned int nBeta;
+  unsigned int nBetaB;
+  unsigned int nBetaH;
+  unsigned int nShower;
+  unsigned int nVertex;
+  unsigned int particleType;
+  float        liveTime;
+  float        utcTime;
+  float        utcTimeCorrected;
+  float        orbitAltitude;
+  float        orbitLatitude;
+  float        orbitLongitude;
+  float        orbitLatitudeM;
+  float        orbitLongitudeM;
+  float        velR;
+  float        velTheta;
+  float        velPhi;
+  float        yaw;
+  float        pitch;
+  float        roll;
+  float        gLongitude;
+  float        gLatitude;
+  int          gCoordCalcResult;
+  float        sunPosAzimuth;
+  float        sunPosElevation;
+  int          sunPosCalcResult;
+  unsigned int unixTime;
+  int          isInShadow;
+  unsigned int ptlCharge;
+  float        ptlMomentum;
+  float        ptlTheta;
+  float        ptlPhi;
+  float        ptlCoo[3];
+  float        ptlCutOffStoermer;
+  float        ptlCutOffDipole;
+  float        ptlCutOffMax[2];
+  float        showerEnergyD;
+
+};
