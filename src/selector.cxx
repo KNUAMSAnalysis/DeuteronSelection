@@ -185,6 +185,7 @@ bool IsInSolarArrays(AMSEventR* thisEvent)
  */
 bool IsGoodTrTrack(TrTrackR* thisTrack)
 {/*{{{*/
+  // 1. THE EVENT SHOULD HAVE MAXSPAN TRACK
   bool debugMode = false;
 
   if( !thisTrack )
@@ -198,11 +199,8 @@ bool IsGoodTrTrack(TrTrackR* thisTrack)
     return false;
   }
 
-  int id_fullspan;
-  id_fullspan = thisTrack->iTrTrackPar(1, 7, 0);
   int id_maxspan;
   id_maxspan = thisTrack->iTrTrackPar(1, 0, 20);
-  //int id_inner;
 
   /*
   if( id_fullspan < 0 )
@@ -263,13 +261,13 @@ bool IsGoodTrTrack(TrTrackR* thisTrack)
   */
 
   bool hitOnLayerJ[9];
-  for(int i = 0; i < 9; i++) hitOnLayerJ[i] = thisTrack->TestHitBitsJ(i, id_fullspan);
+  for(int i = 0; i < 9; i++) hitOnLayerJ[i] = thisTrack->TestHitBitsJ(i, id_maxspan);
 
   if( !(hitOnLayerJ[2] || hitOnLayerJ[3]) ) { if( debugMode ){cerr << "No hit on layer 2/3 " << endl;} return false; }
   if( !(hitOnLayerJ[4] || hitOnLayerJ[5]) ) { if( debugMode ){cerr << "No hit on layer 4/5 " << endl;} return false; }
   if( !(hitOnLayerJ[6] || hitOnLayerJ[7]) ) { if( debugMode ){cerr << "No hit on layer 6/7 " << endl;} return false; }
 
-  // Recject events with rigidity less than 0.5 GV
+  // Reject events with rigidity less than 0.5 GV
   if( thisTrack->GetRigidity(id_maxspan) < 0.5 ) return false;
 
   return true;

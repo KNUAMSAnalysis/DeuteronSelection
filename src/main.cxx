@@ -11,52 +11,32 @@
 #define __AMSINC__
 #include "amschain.h"
 #include "TrdKCluster.h"
-#include "selector.h"
 #endif
 
 #ifndef __ACSOFTINC__
 #define __ACSOFTINC__
-#include "ConfigHandler.hh"
-#include "Event.h"
-#include "Selector.hh"
 #include "FileManager.hh"
-#include "SlowControlLookup.hh"
+#include "AMSRootSupport.hh"
+#include "AMSRootParticleFactory.hh"
 #include "Utilities.hh"
-#include "BinningDefinition.hh"
-#include "TrdTrack.hh"
-#include "TrdTracking.hh"
-#include "SplineTrack.hh"
-#include "ACQtVersion.h"
-#include "AnalysisParticle.hh"
-#include "AnalysisEvent.hh"
-#include "EventFactory.hh"
-#include "DetectorManager.hh"
-#include "SelectionParser.hh"
-#include "ObjectManager.hh"
-#include "TimeHistogramManager.hh"
-#include "EcalTrkMatchingTmva.hh"
-#include "Environment.hh"
-#include "TrdLikelihoodCalculation.hh"
-#include "TrdParametrizedPDFs.hh"
-#include "DeadStrawLookup.hh"
-#include "CutFactory.hh"
+#include "SlowControlLookup.hh"
 
 #include <TFile.h>
 #include <TH1.h>
 #include <TH2.h>
 #include <TStopwatch.h>
 #include <TTree.h>
-#include "ConfigHandler.hh"
-#include "SlowControlLookup.hh"
-#include "AMSRootSupport.hh"
-#include "AMSRootParticleFactory.hh"
 #endif
+
+#include "selector.h"
 
 // Some global variables
 char releaseName[16];
 char softwareName[10] = "ACCTOFInt";
 char versionNumber[5] = "0.01";
 bool debugMode = false;
+
+bool RegisterFileToChain(int argc, char* argv[], AMSChain* amsChain);
 
 /**
  * @brief This is main() function.
@@ -69,131 +49,32 @@ int main(int argc, char* argv[])
 {
   sprintf(releaseName, "%s%s", softwareName, versionNumber);
 
-  /*************************************************************************************************************
-   *
-   * FILE OPENING PHASE
-   *
-   *************************************************************************************************************/
-
-  // Unfold below to see the details of file opening
-  /*{{{*/
-
-  /*
-   * 1. Test mode
-   *   1-1. Skirmish test
-   *     Use the designated run to test the code. No arguments are required. ( argc == 1)
-   *   1-2. Skirmish test within given number of events
-   *     User should pass the number of events to be analyzed as the program argument.
-   *     ./a.out <number of events to be analyzed>  ( argc == 2 )
-   *   1-3. Test using user-given run file within given number of events
-   *     ./a.out <run file to be analyzed> <output file> <number of events to be analyzed> ( argc == 4 )
-   *
-   * 2. Job submission mode
-   *   2-1. Standard job submission mode
-   *     ./a.out <list file which contains list of files to be analyzed> <output file> ( argc == 3 )
-   */
-
-  // AMSChain
-  AMSChain amsChain;
-
-  //char skirmishRunPath[] = "root://eosams.cern.ch//eos/ams/Data/AMS02/2011B/ISS.B620/pass4/1323051106.00000001.root";   // Path of test run
-  char skirmishRunPath[] = "root://eosams.cern.ch//eos/ams/Data/AMS02/2014/ISS.B950/pass6/1323051106.00000001.root";   // Path of test run
-  //char skirmishRunPath[] = "1323051106.00000001.root";
-  //char skirmishRunPath[] = "root://eosams.cern.ch//eos/ams/MC/AMS02/2014/d.B1030/d.pl1.0_520_GG_Blic/872728226.00000001.root";
-  char inputFileName[256];      // File path for single run. (Cat 3.)
-  char outputFileName[256];     // The name of the output file to be stored in the disk.
+  AMSChain *amsChain = new AMSChain();
   unsigned int  nEntries = 0;            // Number of entries to be analyzed.
+  char outputFileName[256];     // The name of the output file to be stored in the disk.
 
-  if( argc == 1 )
+  bool isDataLoadedOk = RegisterFileToChain(argc, argv, amsChain);
+
+  if( isDataLoadedOk != true )
   {
-    std::cout << "[" << releaseName << "] RUN MODE : Single Test Run (Cat. 1)" << endl;
-
-    if(amsChain.Add(skirmishRunPath) != 1)
-    {
-      std::cerr << "[" << releaseName << "] ERROR    : File open error, [" << skirmishRunPath << "] can not be found!" << endl;
-      return -1;
-    }
-
-    strcpy(outputFileName, "testrun.root");
-    nEntries = amsChain.GetEntries();
+    std::cout << "[" << releaseName <<"] FATAL ERROR: File Open Failed! " << std::endl;
+    return -1;
   }
-  else if( argc == 2 ) // Process as many events as user requested. (second argument is number of events to be processed)
-  {
-    std::cout << "[" << releaseName << "] RUN MODE : Single Test Run (Cat. 2)" << endl;
 
-    if(amsChain.Add(skirmishRunPath) != 1)
-    {
-      std::cerr << "[" << releaseName << "] ERROR    : File open error, [" << skirmishRunPath << "] can not be found!" << endl;
-      return -1;
-    }
+  nEntries = amsChain->GetEntries();
+  if( argc == 1 ) strcpy(outputFileName, "testrun.root");
+  else if( argc == 2 ) strcpy(outputFileName, "testrun.root");
+  else if( argc == 3 ) strcpy(outputFileName, argv[2]);
+  else if( argc == 4 ) strcpy(outputFileName, argv[2]);
 
-    strcpy(outputFileName, "testrun.root");
-    nEntries = atoi(argv[1]);
-  }
-  else if( argc == 3 )
-  {
-    std::cout << "[" << releaseName << "] RUN MODE : Batch-job Mode" << endl;
+  std::cout << "[" << releaseName << "] TOTAL EVENTS   : " << nEntries << std::endl;
+  std::cout << "[" << releaseName << "] OUTPUT FILE NAME : " << outputFileName << std::endl;
 
-    char listFileName[256];       // The name of the list file.
-    char inputFileName[256];
-
-    FILE* fp;                     // File pointer to read list file.
-
-    strcpy(listFileName, argv[1]);     // First argument is list file
-    strcpy(outputFileName, argv[2]);   // Second argument is output file name.
-
-    if( ( fp = fopen( listFileName, "r") ) == NULL )
-    {
-      std::cerr << "[" << releaseName << "] ERROR     : Failed to open file [" << listFileName << "]!" << endl;
-      return -1;
-    }
-
-    char* line_p;                 // Character pointer to filter out CRLF at the end of each line.
-    while( fgets( inputFileName, 256, fp ) != NULL )
-    {
-      if( ( line_p = strchr(inputFileName, '\n') ) != NULL) *line_p = 0;  // Filter out \n at the end of lines.
-
-      if(amsChain.Add( inputFileName ) != 1)
-      {
-        std::cerr << "[" << releaseName << "] ERROR     : Failed to open file [" << inputFileName << "]!" << endl;
-        return -1;
-      }
-      else
-      {
-        std::cout << "[" << releaseName << "] The file [" << inputFileName << "] is added to the chain." << std::endl;
-        std::cout << "[" << releaseName << "] Currently loaded events : " << amsChain.GetEntries() << std::endl;
-      }
-    }
-
-    fclose(fp);
-
-    nEntries = amsChain.GetEntries();
-  }
-  else if( argc >= 4 )
-  {
-    std::cout << "[" << releaseName << "] RUN MODE : Single Test Run (Cat. 3)" << endl;
-
-    strcpy(inputFileName, argv[1]);
-    strcpy(outputFileName, argv[2]);
-    nEntries = atoi(argv[3]);
-
-    if(amsChain.Add(inputFileName) != 1)
-    {
-      std::cerr << "[" << releaseName << "] ERROR   : File open error, [" << inputFileName << "] can not found!" << endl;
-      return -1;
-    }
-
-    std::cout << "[" << releaseName << "] The file [" << inputFileName << "] is added to the chain." << std::endl;
-  }/*}}}*/
-
-  std::cout << "[" << releaseName << "] TOTAL EVENTS   : " << nEntries << endl;
-  std::cout << "[" << releaseName << "] OUTPUT FILE NAME : " << outputFileName << endl;
-
-  /***********************************************************************************************************************
-   *
-   *  ANALYSIS PHASE
-   *
-   ***********************************************************************************************************************/
+   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+   //
+   //  ANALYSIS PHASE
+   //
+   ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   AMSSetupR::RTI::UseLatest();
   TkDBc::UseFinal();
@@ -298,20 +179,24 @@ int main(int argc, char* argv[])
   int           trkFitCodeFS;
   float         trkRigidityFS;
   float         trkRigidityInverseErrorFS;
-  float         trkReducedChisquareFS;
+  float         trkReducedChisquareFSX;
+  float         trkReducedChisquareFSY;
   int           trkFitCodeMS;
   float         trkRigidityMS;
   float         trkRigidityInverseErrorMS;
-  float         trkReducedChisquareMS;
+  float         trkReducedChisquareMSX;
+  float         trkReducedChisquareMSY;
   int           trkFitCodeInner;
   float         trkRigidityInner;
   float         trkRigidityInverseErrorInner;
-  float         trkReducedChisquareInner;
+  float         trkReducedChisquareInnerX;
+  float         trkReducedChisquareInnerY;
   int           trkEdepLayerJXSideOK[9];
   int           trkEdepLayerJYSideOK[9];
   float         trkEdepLayerJ[9];
   float         trkCharge;
   float         trkInnerCharge;
+  int           trkHasExtLayers;
   int           richRebuild;
   int           richIsGood;
   int           richIsClean;
@@ -494,20 +379,24 @@ int main(int argc, char* argv[])
   tree->Branch("trkFitCodeFS",                            &trkFitCodeFS,                            "trkFitCodeFS/I");
   tree->Branch("trkRigidityFS",                           &trkRigidityFS,                           "trkRigidityFS/F");
   tree->Branch("trkRigidityInverseErrorFS",               &trkRigidityInverseErrorFS,               "trkRigidityInverseErrorFS/F");
-  tree->Branch("trkReducedChisquareFS",                   &trkReducedChisquareFS,                   "trkReducedChisquareFS/F");
+  tree->Branch("trkReducedChisquareFSX",                  &trkReducedChisquareFSX,                  "trkReducedChisquareFSX/F");
+  tree->Branch("trkReducedChisquareFSY",                  &trkReducedChisquareFSY,                  "trkReducedChisquareFSY/F");
   tree->Branch("trkFitCodeMS",                            &trkFitCodeMS,                            "trkFitCodeMS/I");
   tree->Branch("trkRigidityMS",                           &trkRigidityMS,                           "trkRigidityMS/F");
   tree->Branch("trkRigidityInverseErrorMS",               &trkRigidityInverseErrorMS,               "trkRigidityInverseErrorMS/F");
-  tree->Branch("trkReducedChisquareMS",                   &trkReducedChisquareMS,                   "trkReducedChisquareMS/F");
+  tree->Branch("trkReducedChisquareMSX",                  &trkReducedChisquareMSX,                  "trkReducedChisquareMSX/F");
+  tree->Branch("trkReducedChisquareMSY",                  &trkReducedChisquareMSY,                  "trkReducedChisquareMSY/F");
   tree->Branch("trkFitCodeInner",                         &trkFitCodeInner,                         "trkFitCodeInner/I");
   tree->Branch("trkRigidityInner",                        &trkRigidityInner,                        "trkRigidityInner/F");
   tree->Branch("trkRigidityInverseErrorInner",            &trkRigidityInverseErrorInner,            "trkRigidityInverseErrorInner/F");
-  tree->Branch("trkReducedChisquareInner",                &trkReducedChisquareInner,                "trkReducedChisquareInner/F");
+  tree->Branch("trkReducedChisquareInnerX",               &trkReducedChisquareInnerX,               "trkReducedChisquareInnerX/F");
+  tree->Branch("trkReducedChisquareInnerY",               &trkReducedChisquareInnerY,               "trkReducedChisquareInnerY/F");
   tree->Branch("trkEdepLayerJXSideOK",                    &trkEdepLayerJXSideOK,                    "trkEdepLayerJXSideOK[9]/I");
   tree->Branch("trkEdepLayerJYSideOK",                    &trkEdepLayerJYSideOK,                    "trkEdepLayerJYSideOK[9]/I");
   tree->Branch("trkEdepLayerJ",                           &trkEdepLayerJ,                           "trkEdepLayerJ[9]/F");
   tree->Branch("trkCharge",                               &trkCharge,                               "trkCharge/F");
   tree->Branch("trkInnerCharge",                          &trkInnerCharge,                          "trkInnerCharge/F");
+  tree->Branch("trkHasExtLayers",                         &trkHasExtLayers,                         "trkHasExtLayers/F");
   tree->Branch("richRebuild",                             &richRebuild,                             "richRebuild/I");
   tree->Branch("richIsGood",                              &richIsGood,                              "richIsGood/I");
   tree->Branch("richIsClean",                             &richIsClean,                             "richIsClean/I");
@@ -519,8 +408,8 @@ int main(int argc, char* argv[])
   tree->Branch("richBetaError",                           &richBetaError,                           "richBetaError/F");
   tree->Branch("richChargeSquared",                       &richChargeSquared,                       "richChargeSquared/F");
   tree->Branch("richKolmogorovProbability",               &richKolmogorovProbability,               "richKolmogorovProbability/F");
-  tree->Branch("richPhotoelectrons",                      &richPhotoelectrons,                      "richPhotoelectrons/N");
-  tree->Branch("richExpectedPhotoelectrons",              &richExpectedPhotoelectrons,              "richExpectedPhotoelectrons/N");
+  tree->Branch("richPhotoelectrons",                      &richPhotoelectrons,                      "richPhotoelectrons/I");
+  tree->Branch("richExpectedPhotoelectrons",              &richExpectedPhotoelectrons,              "richExpectedPhotoelectrons/I");
   tree->Branch("richTheta",                               &richTheta,                               "richTheta/F");
   tree->Branch("richPhi",                                 &richPhi,                                 "richPhi/F");
   tree->Branch("trdNClusters",                            &trdNClusters,                            "trdNClusters/I");
@@ -584,11 +473,11 @@ int main(int argc, char* argv[])
 //  tree->Branch("accTimePG", &accTimePG);
   /*}}}*/
 
-  /**************************************************************************************************************************
-   *
-   * Begin of the event loop !!
-   *
-   **************************************************************************************************************************/
+   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+   //
+   // Begin of the event loop !!
+   //
+   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   unsigned int nProcessCheck = 10000;
 
@@ -596,7 +485,7 @@ int main(int argc, char* argv[])
   {
     AMSEventR* pev   = NULL;
     HeaderR* header = NULL;
-    pev = amsChain.GetEvent(e);
+    pev = amsChain->GetEvent(e);
     header = &(pev->fHeader);
 
     // Basic cut processes
@@ -624,7 +513,7 @@ int main(int argc, char* argv[])
     hEvtCounter->Fill(3);
     if( !IsTrkAlignmentGood(pev) ) continue;
     hEvtCounter->Fill(4);
-    if( pev->IsInSAA() ) continue;
+    //if( pev->IsInSAA() ) continue;
     hEvtCounter->Fill(5);
     int iParticle = GetGoodParticleIndex(pev);
     if( iParticle == -1 ) continue;
@@ -821,14 +710,16 @@ int main(int argc, char* argv[])
       trkFitCodeFS              = id_fullspan;
       trkRigidityFS             = pTrTrack->GetRigidity(id_fullspan);
       trkRigidityInverseErrorFS = pTrTrack->GetErrRinv(id_fullspan);
-      trkReducedChisquareFS     = pTrTrack->GetNormChisqX(id_fullspan);
+      trkReducedChisquareFSX    = pTrTrack->GetNormChisqX(id_fullspan);
+      trkReducedChisquareFSY    = pTrTrack->GetNormChisqY(id_fullspan);
     }
     else
     {
       trkFitCodeFS              = id_fullspan;
       trkRigidityFS             = -99999.;
       trkRigidityInverseErrorFS = -99999.;
-      trkReducedChisquareFS     = -99999.;
+      trkReducedChisquareFSX    = -99999.;
+      trkReducedChisquareFSY    = -99999.;
     }
 
     // Tracker variables from maximum span setting
@@ -837,14 +728,16 @@ int main(int argc, char* argv[])
       trkFitCodeMS              = id_maxspan;
       trkRigidityMS             = pTrTrack->GetRigidity(id_maxspan);
       trkRigidityInverseErrorMS = pTrTrack->GetErrRinv(id_maxspan);
-      trkReducedChisquareMS     = pTrTrack->GetNormChisqX(id_maxspan);
+      trkReducedChisquareMSX    = pTrTrack->GetNormChisqX(id_maxspan);
+      trkReducedChisquareMSY    = pTrTrack->GetNormChisqY(id_maxspan);
     }
     else
     {
       trkFitCodeMS              = id_maxspan;
       trkRigidityMS             = -99999.;
       trkRigidityInverseErrorMS = -99999.;
-      trkReducedChisquareMS     = -99999.;
+      trkReducedChisquareMSX    = -99999.;
+      trkReducedChisquareMSY    = -99999.;
     }
 
     // Tracker variables from inner tracker only setting
@@ -853,14 +746,16 @@ int main(int argc, char* argv[])
       trkFitCodeInner              = id_inner;
       trkRigidityInner             = pTrTrack->GetRigidity(id_inner);
       trkRigidityInverseErrorInner = pTrTrack->GetErrRinv(id_inner);
-      trkReducedChisquareInner     = pTrTrack->GetNormChisqX(id_inner);
+      trkReducedChisquareInnerX    = pTrTrack->GetNormChisqX(id_inner);
+      trkReducedChisquareInnerY    = pTrTrack->GetNormChisqY(id_inner);
     }
     else
     {
       trkFitCodeInner              = id_inner;
       trkRigidityInner             = -99999.;
       trkRigidityInverseErrorInner = -99999.;
-      trkReducedChisquareInner     = -99999.;
+      trkReducedChisquareInnerX    = -99999.;
+      trkReducedChisquareInnerY    = -99999.;
     }
 
     TrRecHitR* pTrRecHit = NULL;          // This should be ParticleR associated hit.
@@ -878,6 +773,7 @@ int main(int argc, char* argv[])
     }
     trkCharge       = pTrTrack->GetQ();
     trkInnerCharge  = pTrTrack->GetInnerQ();
+    trkHasExtLayers = pTrTrack->HasExtLayers();
 
     TrdTrackR* pTrdTrack = pParticle->pTrdTrack();
     if( !pTrdTrack ) continue;
@@ -939,7 +835,7 @@ int main(int argc, char* argv[])
     particleFactory.SetAMSBetaHR(pBeta);
 
     if( !amsRootSupport.SwitchToSpecificTrackFitById(id_maxspan) ) continue;
-    Analysis::Event& event = amsRootSupport.BuildEvent(&amsChain, pev);
+    Analysis::Event& event = amsRootSupport.BuildEvent(amsChain, pev);
 
     // Only do this if you need access to TRD segments/tracks and vertices
     eventFactory.PerformTrdTracking(event);
@@ -963,20 +859,7 @@ int main(int argc, char* argv[])
     tofUpperCharge = particle->UpperTofCharge();
     tofLowerCharge = particle->LowerTofCharge();
 
-    bool pXeOk = false;
-    REGISTER_CUT(slowcontrolLookup,
-               "Slowcontrol data ok",
-               [& pXeOk] (const Analysis::Event&, double& valueForHistograms) -> bool {
-                 return (valueForHistograms = pXeOk);
-               }
-              )
-    TTimeStamp EventTime = event.TimeStamp();
-    double pXe = Utilities::SlowControlLookup::Self()->QueryXenonPressure(EventTime, pXeOk);
-
-    const Analysis::Particle::TrdHitsVector& trdHybridHits = particle->TrdHitsFromTrdAndTrackerTracks();
-    Analysis::TrdLikelihoodCalculation lh(trdHybridHits, pXe);
-    trdPElectronToProtonLogLikelihoodRatio = lh.ComputeElectronProtonLikelihood(trkRigidityMS);
-    //trdPElectronToProtonLogLikelihoodRatio = particle->CalculateElectronProtonLikelihood();
+    trdPElectronToProtonLogLikelihoodRatio = particle->CalculateElectronProtonLikelihood();
     trdPHeliumToProtonLogLikelihoodRatio   = particle->CalculateHeliumProtonLikelihood();
     trdPHeliumToElectronLogLikelihoodRatio = particle->CalculateHeliumElectronLikelihood();
 
@@ -1216,4 +1099,117 @@ int main(int argc, char* argv[])
 
   cout << "[" << releaseName << "] The program is terminated successfully. " << nProcessed << " events are stored." << endl;
   return 0;
+}
+
+bool RegisterFileToChain(int argc, char* argv[], AMSChain* amsChain)
+{
+  // Unfold below to see the details of file opening
+  /*{{{*/
+  /*************************************************************************************************************
+   *
+   * FILE OPENING PHASE
+   *
+   *************************************************************************************************************/
+
+  /*
+   * 1. Test mode
+   *   1-1. Skirmish test
+   *     Use the designated run to test the code. No arguments are required. ( argc == 1)
+   *   1-2. Skirmish test within given number of events
+   *     User should pass the number of events to be analyzed as the program argument.
+   *     ./a.out <number of events to be analyzed>  ( argc == 2 )
+   *   1-3. Test using user-given run file within given number of events
+   *     ./a.out <run file to be analyzed> <output file> <number of events to be analyzed> ( argc == 4 )
+   *
+   * 2. Job submission mode
+   *   2-1. Standard job submission mode
+   *     ./a.out <list file which contains list of files to be analyzed> <output file> ( argc == 3 )
+   */
+
+  //char skirmishRunPath[] = "root://eosams.cern.ch//eos/ams/Data/AMS02/2011B/ISS.B620/pass4/1323051106.00000001.root";   // Path of test run
+  char skirmishRunPath[] = "root://eosams.cern.ch//eos/ams/Data/AMS02/2014/ISS.B950/pass6/1323051106.00000001.root";   // Path of test run
+  //char skirmishRunPath[] = "1323051106.00000001.root";
+  //char skirmishRunPath[] = "root://eosams.cern.ch//eos/ams/MC/AMS02/2014/d.B1030/d.pl1.0_520_GG_Blic/872728226.00000001.root";
+  char inputFileName[256];      // File path for single run. (Cat 3.)
+
+  if( argc == 1 )
+  {
+    std::cout << "[" << releaseName << "] RUN MODE : Single Test Run (Cat. 1)" << endl;
+
+    if(amsChain->Add(skirmishRunPath) != 1)
+    {
+      std::cerr << "[" << releaseName << "] ERROR    : File open error, [" << skirmishRunPath << "] can not be found!" << endl;
+      return false;
+    }
+    else return true;
+  }
+  else if( argc == 2 ) // Process as many events as user requested. (second argument is number of events to be processed)
+  {
+    std::cout << "[" << releaseName << "] RUN MODE : Single Test Run (Cat. 2)" << endl;
+
+    if(amsChain->Add(skirmishRunPath) != 1)
+    {
+      std::cerr << "[" << releaseName << "] ERROR    : File open error, [" << skirmishRunPath << "] can not be found!" << endl;
+      return false;
+    }
+    else return true;
+  }
+  else if( argc == 3 )
+  {
+    std::cout << "[" << releaseName << "] RUN MODE : Batch-job Mode" << endl;
+
+    char listFileName[256];       // The name of the list file.
+    char inputFileName[256];
+
+    FILE* fp;                     // File pointer to read list file.
+
+    strcpy(listFileName, argv[1]);     // First argument is list file
+
+    if( ( fp = fopen( listFileName, "r") ) == NULL )
+    {
+      std::cerr << "[" << releaseName << "] ERROR     : Failed to open file [" << listFileName << "]!" << endl;
+      return false;
+    }
+
+    char* line_p;                 // Character pointer to filter out CRLF at the end of each line.
+    while( fgets( inputFileName, 256, fp ) != NULL )
+    {
+      if( ( line_p = strchr(inputFileName, '\n') ) != NULL) *line_p = 0;  // Filter out \n at the end of lines.
+
+      if(amsChain->Add( inputFileName ) != 1)
+      {
+        std::cerr << "[" << releaseName << "] ERROR     : Failed to open file [" << inputFileName << "]!" << endl;
+        return false;
+      }
+      else
+      {
+        std::cout << "[" << releaseName << "] The file [" << inputFileName << "] is added to the chain." << std::endl;
+        std::cout << "[" << releaseName << "] Currently loaded events : " << amsChain->GetEntries() << std::endl;
+      }
+    }
+
+    fclose(fp);
+    return true;
+
+    //nEntries = amsChain.GetEntries();
+  }
+  else if( argc >= 4 )
+  {
+    std::cout << "[" << releaseName << "] RUN MODE : Single Test Run (Cat. 3)" << endl;
+
+    strcpy(inputFileName, argv[1]);
+
+    if(amsChain->Add(inputFileName) != 1)
+    {
+      std::cerr << "[" << releaseName << "] ERROR   : File open error, [" << inputFileName << "] can not found!" << endl;
+      return false;
+    }
+    else
+    {
+      std::cout << "[" << releaseName << "] The file [" << inputFileName << "] is added to the chain." << std::endl;
+      return true;
+    }
+  }/*}}}*/
+
+  return false;
 }
