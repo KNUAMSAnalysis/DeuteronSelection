@@ -1,6 +1,7 @@
 CXX = g++
 CXXFLAGS = -W -Wall -Wno-unused-parameter -Wno-unknown-pragmas -DAMS_ACQT_INTERFACE -D_PGTRACK_ -Wno-unused-variable -Wno-extra
 
+USERNAME=`whoami`
 # AMS Global Environment
 CVMFS_AMS_OFFLINE = /cvmfs/ams.cern.ch/Offline
 
@@ -24,7 +25,7 @@ endif
 ######################### End of CERN library settings ########################
 
 # AMS Offline Software Related Includes
-INCLUDES = -I${ROOTSYS}/include -I${AMSWD}/include -I./include -I/afs/cern.ch/user/w/wyjang/AMS-ACsoft/io
+INCLUDES = -I${ROOTSYS}/include -I${AMSWD}/include -I./include
 NTUPLE_PG = $(AMSWD)/lib/linuxx8664gcc5.34/ntuple_slc6_PG.so
 ############ End of AMS Offline Software related includes
 

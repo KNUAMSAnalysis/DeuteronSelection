@@ -2,6 +2,7 @@
  * @file      main.cxx
  * @brief     Main body of the system.
  * @author    Wooyoung Jang (wyjang)
+ *            Sinchul Kang
  * @date      2015. 04. 01
  */
 #include <iostream>
