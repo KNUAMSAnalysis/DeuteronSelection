@@ -129,6 +129,7 @@ int main(int argc, char* argv[])
   float         solarArrayCoord[3];
   int           isInShadow;                 // Value for check whether the AMS is in ISS solar panel shadow or not.
   float         zenithAngle;
+  int           isInSAA;
   unsigned int  ptlCharge;                  // ParticleR::Charge value
   float         ptlMomentum;                // ParticleR::Momentum value
   float         ptlTheta;                   // Direction of the incoming particle (polar angle)
@@ -201,6 +202,7 @@ int main(int argc, char* argv[])
   int           richIsGood;
   int           richIsClean;
   int           richIsNaF;
+  int           richUsedHits;
   float         richRingWidth;
   int           richNHits;
   int           richNPMTsOnRing;
@@ -208,8 +210,11 @@ int main(int argc, char* argv[])
   float         richBetaError;
   float         richChargeSquared;
   float         richKolmogorovProbability;
-  float         richPhotoelectrons;
-  float         richExpectedPhotoelectrons;
+  float         richPhotoelectrons;                         // Return value from RichRingR::getPhotoelectrons(bool corr=true)
+  float         richPhotoElectrons;                         // Return value from RichRingR::getPhotoElectrons(int pmt, bool corr)
+  float         richExpectedPhotoelectrons;                 // Return value from RichRingR::getExpectedPhotoElectrons(bool corr=true)
+  float         richExpectedPhotoElectrons;                 // Return value from RichRingR::getExpectedPhotoElectrons(int pmt, bool corr)
+  int           richNUsedHits;
   float         richTheta;
   float         richPhi;
   int           trdNClusters;
@@ -329,6 +334,7 @@ int main(int argc, char* argv[])
   tree->Branch("solarArrayCoord",                         &solarArrayCoord,                         "solarArrayCoord[3]/F");
   tree->Branch("isInShadow",                              &isInShadow,                              "isInShadow/I");
   tree->Branch("zenithAngle",                             &zenithAngle,                             "zenithAngle/F");
+  tree->Branch("isInSAA",                                 &isInSAA,                                 "isInSAA/I");
   tree->Branch("ptlCharge",                               &ptlCharge,                               "ptlCharge/i");
   tree->Branch("ptlMomentum",                             &ptlMomentum,                             "ptlMomentum/F");
   tree->Branch("ptlTheta",                                &ptlTheta,                                "ptlTheta/F");
@@ -401,6 +407,7 @@ int main(int argc, char* argv[])
   tree->Branch("richIsGood",                              &richIsGood,                              "richIsGood/I");
   tree->Branch("richIsClean",                             &richIsClean,                             "richIsClean/I");
   tree->Branch("richIsNaF",                               &richIsNaF,                               "richIsNaF/I");
+  tree->Branch("richUsedHits",                            &richUsedHits,                            "richUsedHits/I");
   tree->Branch("richRingWidth",                           &richRingWidth,                           "richRingWidth/F");
   tree->Branch("richNHits",                               &richNHits,                               "richNHits/I");
   tree->Branch("richNPMTsOnRing",                         &richNPMTsOnRing,                         "richNPMTsOnRing/I");
@@ -408,8 +415,8 @@ int main(int argc, char* argv[])
   tree->Branch("richBetaError",                           &richBetaError,                           "richBetaError/F");
   tree->Branch("richChargeSquared",                       &richChargeSquared,                       "richChargeSquared/F");
   tree->Branch("richKolmogorovProbability",               &richKolmogorovProbability,               "richKolmogorovProbability/F");
-  tree->Branch("richPhotoelectrons",                      &richPhotoelectrons,                      "richPhotoelectrons/I");
-  tree->Branch("richExpectedPhotoelectrons",              &richExpectedPhotoelectrons,              "richExpectedPhotoelectrons/I");
+  tree->Branch("richPhotoelectrons",                      &richPhotoelectrons,                      "richPhotoelectrons/F");
+  tree->Branch("richExpectedPhotoelectrons",              &richExpectedPhotoelectrons,              "richExpectedPhotoelectrons/F");
   tree->Branch("richTheta",                               &richTheta,                               "richTheta/F");
   tree->Branch("richPhi",                                 &richPhi,                                 "richPhi/F");
   tree->Branch("trdNClusters",                            &trdNClusters,                            "trdNClusters/I");
@@ -513,8 +520,6 @@ int main(int argc, char* argv[])
     hEvtCounter->Fill(3);
     if( !IsTrkAlignmentGood(pev) ) continue;
     hEvtCounter->Fill(4);
-    //if( pev->IsInSAA() ) continue;
-    hEvtCounter->Fill(5);
     int iParticle = GetGoodParticleIndex(pev);
     if( iParticle == -1 ) continue;
     hEvtCounter->Fill(6);/*}}}*/
@@ -549,6 +554,7 @@ int main(int argc, char* argv[])
     pitch           = header->Pitch;
     roll            = header->Roll;
     zenithAngle     = header->Zenith();
+    isInSAA         = pev->IsInSAA();
 
     double tmpglong;
     double tmpglat;
@@ -669,6 +675,7 @@ int main(int argc, char* argv[])
     BetaHR* pBeta       = pParticle->pBetaH();
     if(!pBeta) continue;
     tofBeta             = pBeta->GetBeta();
+    tofInvBetaErr       = pBeta->GetEBetaV();
     tofMass             = pBeta->GetMass();
     tofMassError        = pBeta->GetEMass();
     tofNUsedHits        = pBeta->NTofClusterH();
@@ -871,7 +878,9 @@ int main(int argc, char* argv[])
       richIsClean               = -1;
       richIsNaF                 = -1;
       richRingWidth             = -1;
+      richUsedHits              = -1;
       richNHits                 = -1;
+      richNPMTsOnRing           = -1;
       richBeta                  = -1;
       richBetaError             = -1;
       richChargeSquared         = -1;
@@ -887,8 +896,10 @@ int main(int argc, char* argv[])
       richIsGood                 = (int)richRing->IsGood();
       richIsClean                = (int)richRing->IsClean();
       richIsNaF                  = (int)richRing->IsNaF();
+      richUsedHits               = (int)richRing->getUsedHits();
       richRingWidth              = (float)richRing->RingWidth();
       richNHits                  = richRing->getHits();
+      richNPMTsOnRing            = richRing->getPMTs();
       richBeta                   = richRing->getBeta();
       richBetaError              = richRing->getBetaError();
       richChargeSquared          = richRing->getCharge2Estimate();
